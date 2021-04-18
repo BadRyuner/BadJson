@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Running;
 
 namespace BadJson.Test
 {
@@ -15,8 +12,6 @@ namespace BadJson.Test
 
         public static void Main(string[] args)
         {
-            BenchmarkRunner.Run<JsonBenchmark>();
-
             MyBenchmark();
 
             Console.ReadKey();
@@ -24,42 +19,83 @@ namespace BadJson.Test
 
         static void MyBenchmark()
         {
+            var counter = int.Parse(Console.ReadLine());
+
+            JsonBenchmark jsonBenchmark = new JsonBenchmark(counter);
+
             var timer = System.Diagnostics.Stopwatch.StartNew();
-            var a = new BadJsonReader(myjson);
+            jsonBenchmark.MyJsontest();
             timer.Stop();
-            Console.WriteLine($"BadJson\n{timer.ElapsedMilliseconds}ms\n{a.Result["String"]}\n{string.Join(",", a.Result["String_array"])}\n{a.Result["Int"]}\n{string.Join(",", a.Result["Int_array"])}\n");
+            Console.WriteLine($"BadJson: {timer.Elapsed}");
+
+            #if DEBUG
+            foreach (var i in JsonBenchmark.junkk[0])
+            {
+                if (i.Value is string[] a) { Console.WriteLine($"{i.Key} | {string.Join(",", a)}"); }
+                else { Console.WriteLine($"{i.Key} | {i.Value}"); }
+            }
+            #endif
 
             timer.Restart();
-            var b = Utf8Json.JsonSerializer.Deserialize<MyJsonStruct>(myjson);
+            jsonBenchmark.MyJsontestWithStruct();
             timer.Stop();
-            Console.WriteLine($"utf8json\n{timer.ElapsedMilliseconds}ms\n{b.String}\n{b.String_array}\n{b.Int}\n{b.Int_Array}\n");
+            Console.WriteLine($"BadJson with struct: {timer.Elapsed}");
+
+            #if DEBUG
+            var readed = BadJsonReader.Deserialize<MyJsonStruct>(myjson);
+            Console.WriteLine($"{readed.Num}\n{readed.Nums}\n{readed.Text}\n{string.Join(",", readed.TextArray)}");
+            #endif
+
+            timer.Restart();
+            jsonBenchmark.Newtonsofttest();
+            timer.Stop();
+            Console.WriteLine($"Newtonsoft: {timer.Elapsed}");
+
+            timer.Restart();
+            jsonBenchmark.SystemTextJson();
+            timer.Stop();
+            Console.WriteLine($"SystemTextJson: {timer.Elapsed}");
         }
 
         public class JsonBenchmark
         {
+            public JsonBenchmark(int counter) => _counter = counter;
+            private int _counter;
 
-            [Benchmark]
-            public void Utf8Jsontest()
+            public void SystemTextJson()
             {
-                Utf8Json.JsonSerializer.Deserialize<MyJsonStruct>(Program.myjson);
+                for (int i = 0; i < _counter; i++)
+                    System.Text.Json.JsonSerializer.Deserialize<MyJsonStruct>(Program.myjson);
             }
 
-            [Benchmark]
+            public void Newtonsofttest()
+            {
+                for (int i = 0; i < _counter; i++)
+                    Newtonsoft.Json.JsonConvert.DeserializeObject<MyJsonStruct>(Program.myjson);
+            }
+
             public void MyJsontest()
             {
-                new BadJsonReader(Program.myjson);
+                for (int i = 0; i < _counter; i++)
+                    BadJsonReader.Deserialize(Program.myjson);
+            }
+
+            public void MyJsontestWithStruct()
+            {
+                for (int i = 0; i < _counter; i++)
+                    BadJsonReader.Deserialize<MyJsonStruct>(Program.myjson);
             }
         }
 
         public struct MyJsonStruct
         {
-            public string String { get; set; }
+            public string Text { get; set; }
 
-            public string[] String_array { get; set; }
+            public string[] TextArray { get; set; }
 
-            public int Int { get; set; }
+            public int Num { get; set; }
 
-            public string[] Int_Array { get; set; }
+            public int[] Nums { get; set; }
         }
     }
 }
